@@ -192,9 +192,9 @@ do_report_timers(TsStr, State) ->
                 MaxAtThreshold  = lists:nth(NumInThreshold, Values),
                 Mean            = lists:sum(Values1) / NumInThreshold,
                 %% Build stats string for graphite
-                Startl          = [ "stats.timers.", KeyS, ".", Host, "." ],
+                Startl          = [ "stats.timers.", KeyS, "." ],
                 Endl            = [" ", TsStr, "\n"],
-                Fragment        = [ [Startl, Name, " ", num2str(Val), Endl] || {Name,Val} <-
+                Fragment        = [ [Startl, Name, ".", Host, " ", num2str(Val), Endl] || {Name,Val} <-
                                   [ {"mean", Mean},
                                     {"upper", Max},
                                     {"upper_"++num2str(PctThreshold), MaxAtThreshold},
