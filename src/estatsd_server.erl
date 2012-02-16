@@ -37,8 +37,8 @@ start_link(FlushIntervalMs, GraphiteHost, GraphitePort) ->
 %%
 
 init([FlushIntervalMs, GraphiteHost, GraphitePort]) ->
-    error_logger:info_msg("estatsd will flush stats to ~p:~w every ~wms\n", 
-                          [ GraphiteHost, GraphitePort, FlushIntervalMs ]),
+    lager:info("estatsd will flush stats to ~p:~w every ~wms\n", 
+               [ GraphiteHost, GraphitePort, FlushIntervalMs ]),
     ets:new(statsd, [named_table, set]),
     %% Flush out stats to graphite periodically
     {ok, Tref} = timer:apply_interval(FlushIntervalMs, gen_server, cast, 
@@ -103,7 +103,7 @@ send_to_graphite(Msg, State) ->
             gen_tcp:close(Sock),
             ok;
         E ->
-            %error_logger:error_msg("Failed to connect to graphite: ~p", [E]),
+            lager:warning("Failed to connect to Graphite: ~p", [E]),
             E
     end.
 
