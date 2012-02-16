@@ -22,6 +22,7 @@
          terminate/2, code_change/3]).
 
 -record(state, {timers,             % gb_tree of timer data
+                gauges,             % gb_tree of absolute values
                 flush_interval,     % ms interval between stats flushing
                 flush_timer,        % TRef of interval timer
                 graphite_host,      % graphite server host
@@ -46,6 +47,7 @@ init([FlushIntervalMs, GraphiteHost, GraphitePort]) ->
     {ok, Tref} = timer:apply_interval(FlushIntervalMs, gen_server, cast, 
                                                        [?MODULE, flush]),
     State = #state{ timers          = gb_trees:empty(),
+                    gauges          = gb_trees:empty(),
                     flush_interval  = FlushIntervalMs,
                     flush_timer     = Tref,
                     graphite_host   = GraphiteHost,
@@ -53,6 +55,10 @@ init([FlushIntervalMs, GraphiteHost, GraphitePort]) ->
                     hostname        = Hostname
                   },
     {ok, State}.
+
+handle_cast({gauge, Key, Val}, State) ->
+    Gauges = gb_trees:enter(Key, Val, State#state.gauges),
+    {noreply, State#state{gauges = Gauges}};
 
 handle_cast({increment, Key, Delta0, Sample}, State) when Sample >= 0, Sample =< 1 ->
     Delta = Delta0 * ( 1 / Sample ), %% account for sample rates < 1.0
@@ -78,7 +84,8 @@ handle_cast(flush, State) ->
     spawn( fun() -> do_report(All, State) end ),
     %% WIPE ALL
     ets:delete_all_objects(statsd),
-    NewState = State#state{timers = gb_trees:empty()},
+    NewState = State#state{timers = gb_trees:empty(),
+                           gauges = gb_trees:empty()},
     {noreply, NewState}.
 
 handle_call(_,_,State)      -> {reply, ok, State}.
@@ -135,12 +142,14 @@ do_report(All, State) ->
     TsStr = num2str(unixtime()),
     {MsgCounters, NumCounters} = do_report_counters(All, TsStr, State),
     {MsgTimers,   NumTimers}   = do_report_timers(TsStr, State),
+    {MsgGauges,   NumGauges}   = do_report_gauges(TsStr, State),
     %% REPORT TO GRAPHITE
-    case NumTimers + NumCounters of
+    case NumTimers + NumCounters + NumGauges of
         0 -> nothing_to_report;
         NumStats ->
             FinalMsg = [ MsgCounters,
                          MsgTimers,
+                         MsgGauges,
                          %% Also graph the number of graphs we're graphing:
                          "statsd.numStats ", num2str(NumStats), " ", TsStr, "\n"
                        ],
@@ -193,4 +202,17 @@ do_report_timers(TsStr, State) ->
                                   ]],
                 [ Fragment | Acc ]
         end, [], Timings),
+    {Msg, length(Msg)}.
+
+do_report_gauges(TsStr, State) ->
+    Gauges = gb_trees:to_list(State#state.gauges),
+    Host = State#state.hostname,
+    Msg = lists:foldl(
+        fun({Key, Val}, Acc) ->
+                KeyS = key2str(Key),
+                Fragment = [ "gauges.", KeyS, ".", Host, " ",
+                             io_lib:format("~w", [Val]), " ",
+                             TsStr, "\n"],
+                [ Fragment | Acc]
+        end, [], Gauges),
     {Msg, length(Msg)}.

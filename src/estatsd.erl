@@ -3,7 +3,7 @@
 -export([
          increment/1, increment/2, increment/3,
          decrement/1, decrement/2, decrement/3,
-         timing/2
+         timing/2, gauge/2
         ]).
 
 -define(SERVER, estatsd_server).
@@ -20,8 +20,8 @@ timing(Key, Duration) when is_integer(Duration) ->
 timing(Key, Duration) -> 
     gen_server:cast(?SERVER, {timing, Key, erlang:round(Duration)}).
 
-
-
+gauge(Key, Value) when is_integer(Value); is_float(Value) ->
+    gen_server:cast(?SERVER, {gauge, Key, Value}).
 
 % Increments one or more stats counters
 increment(Key) -> increment(Key, 1, 1).
