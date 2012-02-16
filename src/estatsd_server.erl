@@ -25,7 +25,8 @@
                 flush_interval,     % ms interval between stats flushing
                 flush_timer,        % TRef of interval timer
                 graphite_host,      % graphite server host
-                graphite_port       % graphite server port
+                graphite_port,      % graphite server port
+                hostname            % this host
                }).
 
 start_link(FlushIntervalMs, GraphiteHost, GraphitePort) ->
@@ -41,13 +42,15 @@ init([FlushIntervalMs, GraphiteHost, GraphitePort]) ->
                [ GraphiteHost, GraphitePort, FlushIntervalMs ]),
     ets:new(statsd, [named_table, set]),
     %% Flush out stats to graphite periodically
+    {ok, Hostname} = inet:gethostname(),
     {ok, Tref} = timer:apply_interval(FlushIntervalMs, gen_server, cast, 
                                                        [?MODULE, flush]),
     State = #state{ timers          = gb_trees:empty(),
                     flush_interval  = FlushIntervalMs,
                     flush_timer     = Tref,
                     graphite_host   = GraphiteHost,
-                    graphite_port   = GraphitePort
+                    graphite_port   = GraphitePort,
+                    hostname        = Hostname
                   },
     {ok, State}.
 
@@ -145,16 +148,17 @@ do_report(All, State) ->
     end.
 
 do_report_counters(All, TsStr, State) ->
+    Host = State#state.hostname,
     Msg = lists:foldl(
                 fun({Key, {Val0,NumVals}}, Acc) ->
                         KeyS = key2str(Key),
                         Val = Val0 / (State#state.flush_interval/1000),
                         %% Build stats string for graphite
-                        Fragment = [ "stats.", KeyS, " ", 
+                        Fragment = [ "stats.", KeyS, ".", Host, " ", 
                                      io_lib:format("~w", [Val]), " ", 
                                      TsStr, "\n",
 
-                                     "stats_counts.", KeyS, " ", 
+                                     "stats_counts.", KeyS, ".", Host, " ", 
                                      io_lib:format("~w",[NumVals]), " ", 
                                      TsStr, "\n"
                                    ],
