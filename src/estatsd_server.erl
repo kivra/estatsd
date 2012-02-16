@@ -177,6 +177,7 @@ do_report_counters(All, TsStr, State) ->
 
 do_report_timers(TsStr, State) ->
     Timings = gb_trees:to_list(State#state.timers),
+    Host = State#state.hostname,
     Msg = lists:foldl(
         fun({Key, Vals}, Acc) ->
                 KeyS = key2str(Key),
@@ -191,7 +192,7 @@ do_report_timers(TsStr, State) ->
                 MaxAtThreshold  = lists:nth(NumInThreshold, Values),
                 Mean            = lists:sum(Values1) / NumInThreshold,
                 %% Build stats string for graphite
-                Startl          = [ "stats.timers.", KeyS, "." ],
+                Startl          = [ "stats.timers.", KeyS, ".", Host, "." ],
                 Endl            = [" ", TsStr, "\n"],
                 Fragment        = [ [Startl, Name, " ", num2str(Val), Endl] || {Name,Val} <-
                                   [ {"mean", Mean},
