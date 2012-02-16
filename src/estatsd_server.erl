@@ -13,6 +13,9 @@
 
 -export([start_link/3]).
 
+-define(CONNECT_TIMEOUT, 10000).
+-define(SEND_TIMEOUT, 30000).
+
 %-export([key2str/1,flush/0]). %% export for debugging 
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
@@ -87,9 +90,14 @@ terminate(_, _)             -> ok.
 
 send_to_graphite(Msg, State) ->
     % io:format("SENDING: ~s\n", [Msg]),
+    Options = [list,
+               {packet, 0},
+               {send_timeout, ?SEND_TIMEOUT},
+               {send_timeout_close, true}],
     case gen_tcp:connect(State#state.graphite_host,
                          State#state.graphite_port,
-                         [list, {packet, 0}]) of
+                         Options,
+                         ?CONNECT_TIMEOUT) of
         {ok, Sock} ->
             gen_tcp:send(Sock, Msg),
             gen_tcp:close(Sock),
