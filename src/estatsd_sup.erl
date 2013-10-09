@@ -11,6 +11,7 @@
 -define(FLUSH_INTERVAL, appvar(flush_interval, 10000)).
 -define(GRAPHITE_HOST,  appvar(graphite_host,  "127.0.0.1")).
 -define(GRAPHITE_PORT,  appvar(graphite_port,  2003)).
+-define(ENABLED,        appvar(enabled,        true)).
 
 %% ===================================================================
 %% API functions
@@ -24,21 +25,26 @@ start_link(FlushIntervalMs) ->
     start_link( FlushIntervalMs, ?GRAPHITE_HOST, ?GRAPHITE_PORT).
 
 start_link(FlushIntervalMs, GraphiteHost, GraphitePort) ->
-    supervisor:start_link({local, ?MODULE}, 
-                          ?MODULE, 
-                          [FlushIntervalMs, GraphiteHost, GraphitePort]).
+    supervisor:start_link( {local, ?MODULE}
+                         , ?MODULE
+                         , [FlushIntervalMs, GraphiteHost, GraphitePort]).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([FlushIntervalMs, GraphiteHost, GraphitePort]) ->
-    Children = [
-        {estatsd_server, 
-         {estatsd_server, start_link, 
-             [FlushIntervalMs, GraphiteHost, GraphitePort]},
-         permanent, 5000, worker, [estatsd_server]}
-    ],
+    Children =
+        case ?ENABLED of
+            true  ->
+                [{ estatsd_server
+                 , { estatsd_server, start_link
+                   , [FlushIntervalMs, GraphiteHost, GraphitePort]}
+                 , permanent, 5000, worker, [estatsd_server] }];
+            false ->
+                lager:info("estatsd disabled"),
+                []
+        end,
     {ok, { {one_for_one, 10000, 10}, Children} }.
 
 appvar(K, Def) ->
