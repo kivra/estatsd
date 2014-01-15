@@ -4,6 +4,7 @@
 
 %% API
 -export([start_link/0, start_link/1, start_link/3]).
+-export([appvar/2]).
 
 %% Supervisor callbacks
 -export([init/1]).
