@@ -8,5 +8,6 @@
                   stdlib
                  ]},
   {mod, { estatsd_app, []}},
+  {modules, []}
   {env, []}
  ]}.
